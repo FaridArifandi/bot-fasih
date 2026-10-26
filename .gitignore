@@ -1,0 +1,17 @@
+# Kredensial
+sso
+.sso
+sso.txt
+
+# Data & hasil
+*.xlsx
+*.xls
+hasil_approve.csv
+
+# Sesi browser, screenshot, cache
+chrome_debug_profile/
+screenshots/
+__pycache__/
+*.pyc
+venv/
+.venv/
