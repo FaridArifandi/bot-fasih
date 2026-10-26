@@ -36,12 +36,15 @@ FILE_INPUT_DEFAULT = "daftar.xlsx"          # file Excel: kolom A = nama, kolom 
 CDP_PORT = 9223                             # beda dari Bot Nerwana (9222) agar tidak bentrok
 PROFILE_DIR = os.path.join(BASE_DIR, "chrome_debug_profile")
 SCREENSHOTS_DIR = os.path.join(BASE_DIR, "screenshots")
+DEBUG_DIR = os.path.join(BASE_DIR, "debug")
 HASIL_CSV = os.path.join(BASE_DIR, "hasil_approve.csv")
 HASIL_XLSX = os.path.join(BASE_DIR, "hasil_approve.xlsx")
 
 JEDA_ANTAR_LINK_MIN = 2.0                   # detik, acak antar link
 JEDA_ANTAR_LINK_MAX = 3.5
-TIMEOUT_SIAP = 45                           # detik menunggu halaman assignment siap
+TIMEOUT_SIAP = 25                           # detik menunggu halaman assignment siap (direset saat proses SSO)
+POLL = 0.5                                  # detik antar pengecekan halaman
+BLOKIR_GAMBAR = True                        # blok image/media supaya halaman lebih cepat
 MAX_PERCOBAAN_APPROVE = 3                   # percobaan approve per link (dengan perbaikan switch di antaranya)
 MAX_ERR_BERTURUT = 3                        # berhenti jika N error teknis berturut-turut
 SIMPAN_XLSX_SETIAP = 50                     # tulis ulang hasil_approve.xlsx tiap N link
@@ -56,6 +59,10 @@ CHROME_CANDIDATES = [
 ]
 
 os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+os.makedirs(DEBUG_DIR, exist_ok=True)
+
+SIG_APPROVE = None   # "sidik jari" ikon tombol Approve, dipelajari otomatis lewat tooltip
+_dump_ke = 0
 
 
 class SSOGagal(Exception):
@@ -87,6 +94,15 @@ def start_debug_chrome():
         f"--remote-debugging-port={CDP_PORT}",
         f"--user-data-dir={PROFILE_DIR}",
         "--start-maximized",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-extensions",
+        "--disable-sync",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--disable-default-apps",
+        "--disable-features=Translate,OptimizationHints,MediaRouter",
+        "--disk-cache-size=1073741824",
     ])
     for _ in range(20):
         time.sleep(1)
@@ -275,7 +291,7 @@ def isi_form_sso(page):
     except Exception:
         _sso_gagal += 1
         print(f"[SSO] Masih di halaman SSO (gagal ke-{_sso_gagal}).")
-    time.sleep(2.5)
+    time.sleep(1.5)
 
 
 # ============================================================
@@ -293,7 +309,11 @@ JS_BACA_TOMBOL = """() => {
     if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
     const text = (el.innerText || el.textContent || '').trim().replace(/\\s+/g, ' ');
     el.setAttribute('data-bf', String(i));
+    const inner = (el.innerHTML || '').replace(/\\s+/g, ' ');
+    const meta = ((el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className) + ' ' +
+                  (el.id || '') + ' ' + (el.getAttribute('data-testid') || '') + ' ' + inner).slice(0, 600);
     out.push({i: i, text: text, title: el.getAttribute('title') || '', aria: el.getAttribute('aria-label') || '',
+              bg: cs.backgroundColor, meta: meta, sig: (inner || String(el.className)).slice(0, 300),
               x: r.x + r.width / 2, y: r.y + r.height / 2,
               disabled: el.disabled === true || el.getAttribute('aria-disabled') === 'true'});
     i++;
@@ -302,6 +322,19 @@ JS_BACA_TOMBOL = """() => {
 }"""
 
 RE_APPROVE = re.compile(r"\b(approve|setujui)\b", re.I)
+RE_RGB = re.compile(r"rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)")
+
+
+def bg_hijau(bg):
+    """True bila warna latar tombol dominan hijau (tombol centang Approve)."""
+    m = RE_RGB.search(bg or "")
+    if not m:
+        return False
+    r, g, b = (int(x) for x in m.groups())
+    return g > 100 and g > r + 40 and g > b + 40
+
+
+RE_APPROVE_META = re.compile(r"approve(?!d)|setujui", re.I)
 
 
 def baca_tombol(page):
@@ -320,16 +353,84 @@ def cari_tombol_approve(items):
     """Pilih tombol Approve; utamakan yang di kanan-bawah."""
     cocok = []
     for it in items:
+        if SIG_APPROVE and it["sig"] == SIG_APPROVE and it["kanan_bawah"]:
+            cocok.append(it)
+            continue
         for teks in (it["text"], it["title"], it["aria"]):
             if teks and len(teks) <= 30 and RE_APPROVE.search(teks):
                 cocok.append(it)
                 break
+        else:
+            if it["kanan_bawah"] and not it["text"] and RE_APPROVE_META.search(it["meta"]):
+                cocok.append(it)
     if not cocok:
+        # cadangan: tombol ikon berlatar hijau di kanan-bawah (centang Approve)
+        hijau = [it for it in items if it["kanan_bawah"] and not it["text"] and bg_hijau(it.get("bg"))]
+        if len(hijau) == 1:
+            return hijau[0]
         return None
     kb = [c for c in cocok if c["kanan_bawah"]]
     pilih = kb or cocok
     pilih.sort(key=lambda c: -c["y"])
     return pilih[0]
+
+
+JS_TOOLTIP = """() => Array.from(document.querySelectorAll('[role="tooltip"], [class*="tooltip" i], [class*="popover" i]'))
+  .filter(e => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e);
+                 return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0.1; })
+  .map(e => (e.innerText || '').trim()).filter(t => t && t.length < 60)"""
+
+
+def cari_approve_ikon(page, items):
+    """
+    Tombol toolbar berupa ikon tanpa teks: arahkan mouse ke tiap ikon kanan-bawah dan baca tooltip-nya.
+    Bila ada yang bertuliskan Approve, simpan sidik jari ikonnya (SIG_APPROVE) untuk link-link berikutnya.
+    Return (ketemu, daftar_tooltip).
+    """
+    global SIG_APPROVE
+    tips = []
+    kandidat = [it for it in items if it["kanan_bawah"] and not it["text"]]
+    kandidat.sort(key=lambda c: c["y"])
+    for it in kandidat[:8]:
+        try:
+            page.mouse.move(it["x"], it["y"])
+            time.sleep(0.6)
+            t = page.evaluate(JS_TOOLTIP)
+        except Exception:
+            t = []
+        tips.append((it["i"], t))
+        if any(RE_APPROVE.search(x) for x in t):
+            SIG_APPROVE = it["sig"]
+            print("[FASIH] Ikon Approve dikenali lewat tooltip, disimpan untuk link berikutnya.")
+            return True, tips
+    try:
+        page.mouse.move(5, 5)
+    except Exception:
+        pass
+    return False, tips
+
+
+def dump_toolbar(page, items, tips):
+    """Simpan info tombol kanan-bawah ke debug/ supaya selector bisa disesuaikan."""
+    global _dump_ke
+    if _dump_ke >= 5:
+        return ""
+    _dump_ke += 1
+    path = os.path.join(DEBUG_DIR, f"toolbar_{int(time.time())}.txt")
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(f"URL: {page.url}\n\n")
+            for it in items:
+                if it["kanan_bawah"]:
+                    f.write(f"[{it['i']}] text={it['text']!r} title={it['title']!r} aria={it['aria']!r} "
+                            f"pos=({int(it['x'])},{int(it['y'])}) disabled={it['disabled']}\n    meta={it['meta']}\n")
+            f.write("\nTOOLTIP per ikon:\n")
+            for i, t in tips:
+                f.write(f"  [{i}] {t}\n")
+        screenshot(page, "TOOLBAR")
+    except Exception:
+        return ""
+    return path
 
 
 def klik_item(page, item):
@@ -378,6 +479,7 @@ def tunggu_siap(page, link):
     mulai = time.time()
     goto_ulang = 0
     stabil = 0
+    ikon_dicek = False
     while time.time() - mulai < TIMEOUT_SIAP:
         try:
             if page.is_closed():
@@ -411,12 +513,12 @@ def tunggu_siap(page, link):
                     page.goto(link, timeout=60000, wait_until="domcontentloaded")
                 except Exception:
                     pass
-                time.sleep(1.5)
+                time.sleep(0.8)
                 continue
 
             if loading_terlihat(page):
                 stabil = 0
-                time.sleep(1)
+                time.sleep(POLL)
                 continue
 
             if cek_fasih_error(page):
@@ -430,14 +532,22 @@ def tunggu_siap(page, link):
                 # toolbar kanan-bawah sudah ada tapi tanpa tombol Approve -> pastikan stabil 3x
                 stabil += 1
                 if stabil >= 3:
-                    return "SUDAH" if teks_approved_terbaca(page) else "TANPA_TOMBOL"
+                    if teks_approved_terbaca(page):
+                        return "SUDAH"
+                    if not ikon_dicek:
+                        ikon_dicek = True
+                        ketemu, tips = cari_approve_ikon(page, items)
+                        if ketemu:
+                            return "BELUM"
+                        page._bf_tips = tips
+                    return "TANPA_TOMBOL"
             else:
                 stabil = 0
         except SSOGagal:
             raise
         except Exception:
             pass
-        time.sleep(1)
+        time.sleep(POLL)
     return "TIMEOUT"
 
 
@@ -759,7 +869,7 @@ def lakukan_approve(page):
 def proses_link(page, row, dry_run=False, interaktif=False):
     link = row["link"]
     try:
-        page.goto(link, timeout=60000, wait_until="domcontentloaded")
+        page.goto(link, timeout=60000, wait_until="commit")
     except Exception as e:
         print(f"[WARN] goto: {str(e)[:100]}")
 
@@ -786,7 +896,9 @@ def proses_link(page, row, dry_run=False, interaktif=False):
         items = baca_tombol(page)
         daftar = [f"{it['text'] or it['title'] or it['aria'] or '?'}" for it in items if it["kanan_bawah"]]
         screenshot(page, "TIDAK_DIKENALI")
-        return "TIDAK_DIKENALI", "toolbar kanan-bawah tanpa tombol Approve & tanpa teks Approved. Tombol: " + "; ".join(daftar)[:250]
+        dump = dump_toolbar(page, items, getattr(page, "_bf_tips", []))
+        return "TIDAK_DIKENALI", ("toolbar kanan-bawah tanpa tombol Approve & tanpa teks Approved. Tombol: "
+                                  + "; ".join(daftar)[:200] + (f" | detail: {os.path.basename(dump)}" if dump else ""))
 
     screenshot(page, f"{state}")
     return ("ERROR_HALAMAN" if state == "TIMEOUT" else "GAGAL_APPROVE"), f"halaman tidak siap ({state})"
@@ -876,6 +988,9 @@ def main():
         browser = p.chromium.connect_over_cdp(f"http://localhost:{CDP_PORT}")
         context = browser.contexts[0]
         page = context.new_page()
+        if BLOKIR_GAMBAR:
+            page.route("**/*", lambda route: route.abort()
+                       if route.request.resource_type in ("image", "media") else route.continue_())
         page.bring_to_front()
 
         try:
