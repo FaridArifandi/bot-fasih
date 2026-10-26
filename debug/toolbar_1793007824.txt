@@ -1,0 +1,21 @@
+URL: https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/b4a293f0-203b-4431-a9e0-a70e558e52b0
+
+[1] text='' title='' aria='' pos=(1475,492) disabled=False
+    meta=f:inline-flex f:items-center f:justify-center f:whitespace-nowrap f:font-medium f:text-sm f:ring-offset-background f:transition-colors f:focus-visible:outline-none f:focus-visible:ring-2 f:focus-visible:ring-ring f:focus-visible:ring-offset-2 f:disabled:pointer-events-none f:disabled:opacity-50 f:hover:text-accent-foreground f:size-10 f:h-10 f:w-10 f:rounded-full f:bg-muted/30 hover:f:bg-muted/60   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tabler-ico
+[2] text='' title='' aria='' pos=(1475,544) disabled=False
+    meta=f:inline-flex f:items-center f:justify-center f:whitespace-nowrap f:font-medium f:text-sm f:ring-offset-background f:transition-colors f:focus-visible:outline-none f:focus-visible:ring-2 f:focus-visible:ring-ring f:focus-visible:ring-offset-2 f:disabled:pointer-events-none f:disabled:opacity-50 f:bg-primary f:text-primary-foreground f:hover:bg-primary/90 f:size-10 f:h-10 f:w-10 f:rounded-full f:shadow-md   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ta
+[3] text='' title='' aria='' pos=(1475,596) disabled=False
+    meta=f:inline-flex f:items-center f:justify-center f:whitespace-nowrap f:font-medium f:text-sm f:ring-offset-background f:transition-colors f:focus-visible:outline-none f:focus-visible:ring-2 f:focus-visible:ring-ring f:focus-visible:ring-offset-2 f:disabled:pointer-events-none f:disabled:opacity-50 f:bg-destructive f:text-destructive-foreground f:hover:bg-destructive/90 f:size-10 f:h-10 f:w-10 f:rounded-full f:shadow-md   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="roun
+[4] text='' title='' aria='' pos=(1475,648) disabled=False
+    meta=f:inline-flex f:items-center f:justify-center f:whitespace-nowrap f:font-medium f:text-sm f:ring-offset-background f:transition-colors f:focus-visible:outline-none f:focus-visible:ring-2 f:focus-visible:ring-ring f:focus-visible:ring-offset-2 f:disabled:pointer-events-none f:disabled:opacity-50 f:size-10 f:h-10 f:w-10 f:rounded-full f:shadow-md f:bg-success f:text-success-foreground hover:f:bg-success/90   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ta
+[5] text='' title='' aria='' pos=(1475,700) disabled=False
+    meta=f:inline-flex f:items-center f:justify-center f:whitespace-nowrap f:font-medium f:text-sm f:ring-offset-background f:transition-colors f:focus-visible:outline-none f:focus-visible:ring-2 f:focus-visible:ring-ring f:focus-visible:ring-offset-2 f:disabled:pointer-events-none f:disabled:opacity-50 f:bg-primary f:text-primary-foreground f:hover:bg-primary/90 f:size-10 f:h-10 f:w-10 f:rounded-full f:shadow-md   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ta
+[8] text='BERIKUTNYA IDENTITAS WILAYAH' title='IDENTITAS WILAYAH' aria='' pos=(1408,785) disabled=False
+    meta=tw:inline-flex tw:justify-center tw:font-medium tw:text-sm tw:focus-visible:outline-hidden tw:focus-visible:ring-1 tw:focus-visible:ring-primary tw:focus-visible:ring-offset-2 tw:focus-visible:ring-offset-background tw:disabled:pointer-events-none tw:disabled:opacity-50 tw:py-2 tw:h-14 tw:w-full tw:max-w-[calc(50vw-1.5rem)] tw:items-center tw:rounded-xl tw:px-3 tw:shadow-2xs tw:transition-all tw:duration-200 tw:md:max-w-48 tw:bg-primary tw:text-primary-foreground tw:hover:scale-[1.02] tw:hover:bg-primary/90 tw:hover:shadow-sm tw:active:scale-[0.98] fasih-form-nav-next-button  <div class="tw:fl
+
+TOOLTIP per ikon:
+  [1] ['Ctrl+/']
+  [2] ['Ctrl+/']
+  [3] ['Ctrl+/']
+  [4] ['Ctrl+/']
+  [5] ['Ctrl+/']

@@ -42,9 +42,10 @@ HASIL_XLSX = os.path.join(BASE_DIR, "hasil_approve.xlsx")
 
 JEDA_ANTAR_LINK_MIN = 2.0                   # detik, acak antar link
 JEDA_ANTAR_LINK_MAX = 3.5
-TIMEOUT_SIAP = 25                           # detik menunggu halaman assignment siap (direset saat proses SSO)
+TIMEOUT_SIAP = 40                           # detik menunggu halaman assignment siap (direset saat proses SSO)
 POLL = 0.5                                  # detik antar pengecekan halaman
-BLOKIR_GAMBAR = True                        # blok image/media supaya halaman lebih cepat
+BLOKIR_GAMBAR = False                       # True = blok image/media (sempat bikin halaman kosong, biarkan False)
+RELOAD_SETELAH = 15                         # detik tanpa kemajuan -> buka ulang link (reload) lalu tunggu lagi
 MAX_PERCOBAAN_APPROVE = 3                   # percobaan approve per link (dengan perbaikan switch di antaranya)
 MAX_ERR_BERTURUT = 3                        # berhenti jika N error teknis berturut-turut
 SIMPAN_XLSX_SETIAP = 50                     # tulis ulang hasil_approve.xlsx tiap N link
@@ -311,7 +312,7 @@ JS_BACA_TOMBOL = """() => {
     el.setAttribute('data-bf', String(i));
     const inner = (el.innerHTML || '').replace(/\\s+/g, ' ');
     const meta = ((el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className) + ' ' +
-                  (el.id || '') + ' ' + (el.getAttribute('data-testid') || '') + ' ' + inner).slice(0, 600);
+                  (el.id || '') + ' ' + (el.getAttribute('data-testid') || '') + ' ' + inner).slice(0, 1000);
     out.push({i: i, text: text, title: el.getAttribute('title') || '', aria: el.getAttribute('aria-label') || '',
               bg: cs.backgroundColor, meta: meta, sig: (inner || String(el.className)).slice(0, 300),
               x: r.x + r.width / 2, y: r.y + r.height / 2,
@@ -334,7 +335,7 @@ def bg_hijau(bg):
     return g > 100 and g > r + 40 and g > b + 40
 
 
-RE_APPROVE_META = re.compile(r"approve(?!d)|setujui", re.I)
+RE_APPROVE_META = re.compile(r"approve(?!d)|setujui|bg-success|tabler-icon-check\b", re.I)
 
 
 def baca_tombol(page):
@@ -480,6 +481,8 @@ def tunggu_siap(page, link):
     goto_ulang = 0
     stabil = 0
     ikon_dicek = False
+    sudah_reload = False
+    terakhir_maju = time.time()
     while time.time() - mulai < TIMEOUT_SIAP:
         try:
             if page.is_closed():
@@ -488,6 +491,7 @@ def tunggu_siap(page, link):
             if di_halaman_sso(page):
                 isi_form_sso(page)
                 mulai = time.time()
+                terakhir_maju = time.time()
                 continue
 
             if di_layar_login_fasih(page):
@@ -500,6 +504,7 @@ def tunggu_siap(page, link):
                 btn.first.click()
                 time.sleep(3)
                 mulai = time.time()
+                terakhir_maju = time.time()
                 continue
 
             url = page.url.lower()
@@ -519,6 +524,18 @@ def tunggu_siap(page, link):
             if loading_terlihat(page):
                 stabil = 0
                 time.sleep(POLL)
+                continue
+
+            # Tidak ada kemajuan (halaman kosong / macet) -> reload link sekali lalu tunggu lagi
+            if not sudah_reload and time.time() - terakhir_maju > RELOAD_SETELAH:
+                sudah_reload = True
+                print(f"[FASIH] Halaman belum siap setelah {RELOAD_SETELAH} detik, reload link lalu tunggu lagi...")
+                try:
+                    page.goto(link, timeout=60000, wait_until="domcontentloaded")
+                except Exception:
+                    pass
+                mulai = time.time()
+                terakhir_maju = time.time()
                 continue
 
             if cek_fasih_error(page):
@@ -869,7 +886,7 @@ def lakukan_approve(page):
 def proses_link(page, row, dry_run=False, interaktif=False):
     link = row["link"]
     try:
-        page.goto(link, timeout=60000, wait_until="commit")
+        page.goto(link, timeout=60000, wait_until="domcontentloaded")
     except Exception as e:
         print(f"[WARN] goto: {str(e)[:100]}")
 
